@@ -749,8 +749,13 @@ class TestApplyFlowOperations:
         assert result.flow_data["viewport"] == flow_data["viewport"]
 
 
-@pytest.mark.parametrize("selector", [{"id": ""}, {"key": ""}])
-def test_selectors_must_name_a_non_empty_key(selector):
-    path = ["data", "node", "template", "rows", "value", selector]
+def test_selectors_must_name_a_non_empty_key():
+    path = ["data", "node", "template", "rows", "value", {"key": ""}]
     with pytest.raises(FlowOperationValidationError, match="at least 1 character"):
+        parse_flow_operations([{"type": "update_nodes", "updates": [{"id": "a", "op": "delete_field", "path": path}]}])
+
+
+def test_an_id_selector_is_not_a_path_segment():
+    path = ["data", "node", "template", "rows", "value", {"id": "r1"}]
+    with pytest.raises(FlowOperationValidationError):
         parse_flow_operations([{"type": "update_nodes", "updates": [{"id": "a", "op": "delete_field", "path": path}]}])
