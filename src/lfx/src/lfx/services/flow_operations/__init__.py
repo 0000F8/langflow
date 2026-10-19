@@ -104,7 +104,6 @@ __all__ = [
     "GraphState",
     "GraphViolation",
     "GraphViolationCode",
-    "IdSelector",
     "KeySelector",
     "KeyedList",
     "NodeFieldPath",
