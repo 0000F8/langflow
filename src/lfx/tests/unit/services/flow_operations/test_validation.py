@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import copy
 import math
 
 import pytest
@@ -9,6 +10,7 @@ from lfx.services.flow_operations import (
     FlowDataValidationError,
     GraphViolationCode,
     find_graph_violations,
+    remove_cut_edges,
     validate_flow_data,
 )
 from lfx.services.flow_operations.edge_rules import escape_handle
@@ -247,3 +249,50 @@ def test_edge_rules_wait_for_a_sound_structure():
     assert [v.code for v in find_graph_violations(graph, base={"nodes": [], "edges": []})] == [
         GraphViolationCode.NODE_ID_DUPLICATE
     ]
+
+
+def _cut_graphs() -> tuple[dict, dict]:
+    """A stored graph with edge ``e`` into field ``f`` of ``b``, and a write that removes ``f`` and keeps ``e``."""
+    handles = {"sourceHandle": {"name": "out"}, "targetHandle": {"fieldName": "f"}}
+    edge = {
+        "id": "e",
+        "source": "a",
+        "target": "b",
+        **{key: escape_handle(value) for key, value in handles.items()},
+        "data": handles,
+    }
+    base = {
+        "nodes": [
+            {"id": "a", "data": {"node": {"template": {}, "outputs": [{"name": "out"}]}}},
+            {"id": "b", "data": {"node": {"template": {"f": {"type": "str"}, "g": {"type": "str"}}}}},
+        ],
+        "edges": [edge],
+    }
+    target = copy.deepcopy(base)
+    del target["nodes"][1]["data"]["node"]["template"]["f"]
+    return base, target
+
+
+def test_remove_cut_edges_removes_the_edges_a_write_cuts():
+    base, target = _cut_graphs()
+
+    assert remove_cut_edges(base, target) == ["e"]
+    assert target["edges"] == []
+    assert find_graph_violations(target, base=base) == []
+
+
+def test_remove_cut_edges_keeps_edges_whose_ends_stay():
+    base, target = _cut_graphs()
+    target = copy.deepcopy(base)
+    del target["nodes"][1]["data"]["node"]["template"]["g"]
+
+    assert remove_cut_edges(base, target) == []
+    assert [edge["id"] for edge in target["edges"]] == ["e"]
+
+
+def test_remove_cut_edges_leaves_an_unsound_target_to_the_save():
+    base, target = _cut_graphs()
+    target["nodes"].append({"id": "a"})
+
+    assert remove_cut_edges(base, target) == []
+    assert [edge["id"] for edge in target["edges"]] == ["e"]
